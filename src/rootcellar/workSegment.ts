@@ -127,7 +127,17 @@ export function buildWorkSegment(conversation: ApiConversationWithId, marker: Wo
     const first = ids[0]
     const end = ids[ids.length - 1]
     const mapping: Record<string, ConversationNode> = Object.create(null)
-    mapping[marker.boundaryNodeId] = { id: marker.boundaryNodeId, children: [first] }
+    // The boundary is deliberately synthetic, but it still uses the ordinary
+    // mapping structural-root shape expected by Root Cellar canonical ingestion:
+    // explicit null parent/message rather than omitted fields. Keep the original
+    // boundary identity only as a locator; rootcellar_work_segment records that
+    // this exported node is synthetic.
+    mapping[marker.boundaryNodeId] = {
+        id: marker.boundaryNodeId,
+        parent: null,
+        children: [first],
+        message: null,
+    } as unknown as ConversationNode
     ids.forEach((id, index) => {
         const node = structuredClone(conversation.mapping[id])
         node.children = index + 1 < ids.length ? [ids[index + 1]] : []
