@@ -24,6 +24,7 @@
     "dev": "vite",
     "build": "vite build",
     "test": "tsc --noEmit",
+    "test:work": "node tests/run.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "prepare": "husky"

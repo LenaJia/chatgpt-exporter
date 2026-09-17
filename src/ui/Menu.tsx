@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { exportToHtml } from '../exporter/html'
 import { exportToPng } from '../exporter/image'
-import { exportToJson, exportToOoba, exportToTavern } from '../exporter/json'
+import { exportToJson, exportToOoba, exportToTavern, exportWorkSegment, markWorkSegmentStart } from '../exporter/json'
 import { exportToMarkdown } from '../exporter/markdown'
 import { exportToText } from '../exporter/text'
 import { useWindowResize } from '../hooks/useWindowResize'
@@ -111,6 +111,8 @@ function MenuInner({ container }: { container: HTMLDivElement }) {
     const onClickOfficialJSON = useCallback(() => exportToJson(format), [format])
     const onClickTavern = useCallback(() => exportToTavern(format), [format])
     const onClickOoba = useCallback(() => exportToOoba(format), [format])
+    const onClickMarkWorkStart = useCallback(() => markWorkSegmentStart(), [])
+    const onClickExportWorkSegment = useCallback(() => exportWorkSegment(), [])
 
     const width = useWindowResize(() => window.innerWidth)
     const isMobile = width < 768
@@ -186,6 +188,18 @@ function MenuInner({ container }: { container: HTMLDivElement }) {
                             icon={IconCopy}
                             className="row-full"
                             onClick={onClickText}
+                        />
+                        <MenuItem
+                            text={t('Mark Work Start')}
+                            icon={IconArrowRightFromBracket}
+                            className="row-half"
+                            onClick={onClickMarkWorkStart}
+                        />
+                        <MenuItem
+                            text={t('Export Work Segment')}
+                            icon={IconJSON}
+                            className="row-half"
+                            onClick={onClickExportWorkSegment}
                         />
                         <MenuItem
                             text={t('Screenshot')}
