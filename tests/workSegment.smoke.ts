@@ -74,7 +74,8 @@ assert.deepEqual(currentPathNodeIds(conversation), ['node-0', 'node-1', 'node-2'
 
 const segment = buildWorkSegment(conversation, marker, '2026-09-17T12:00:00.000Z')
 assert.deepEqual(Object.keys(segment.mapping), ['node-2', 'node-3', 'node-4'])
-assert.equal(segment.mapping['node-2'].message, undefined)
+assert.equal(segment.mapping['node-2'].message, null)
+assert.equal(segment.mapping['node-2'].parent, null)
 assert.deepEqual(segment.mapping['node-2'].children, ['node-3'])
 assert.equal(segment.mapping['node-3'].parent, 'node-2')
 assert.deepEqual(segment.mapping['node-3'].children, ['node-4'])
