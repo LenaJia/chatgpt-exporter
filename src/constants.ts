@@ -18,6 +18,7 @@ export const KEY_THINKING_ENABLED = 'exporter:enable_thinking'
 export const KEY_SOURCES_ENABLED = 'exporter:enable_sources'
 export const KEY_EXPORT_ALL_LIMIT = 'exporter:export_all_limit'
 export const KEY_EXPORTED_UPDATE_TIMES = 'exporter:exported_update_times'
+export const KEY_ROOTCELLAR_WORK_SESSION_MARKERS = 'rootcellar:work_session_markers:v1'
 
 export const KEY_OAI_LOCALE = 'oai/apps/locale'
 
