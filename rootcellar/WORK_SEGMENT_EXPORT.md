@@ -5,7 +5,9 @@ Status: PR #1 remains draft. Source and built userscript are intended for superv
 ## Scope and identity
 
 - This is a **derived projection of the backend `current_node` ancestry**, exclusive of the selected boundary. It is not a full raw conversation export or a complete execution trace.
-- One synthetic message-less boundary preserves the parent link. Selected descendant nodes retain their message content and metadata; children lists are pruned. Ancestors and siblings are excluded.
+- One synthetic structural boundary preserves the parent link. Selected descendant nodes retain their message content and metadata; children lists are pruned. Ancestors and siblings are excluded.
+- The synthetic boundary is not an original provider occurrence body. It reuses the boundary node ID only as a locator and is marked by `rootcellar_work_segment.boundary_is_synthetic: true`.
+- For canonical-ingestion compatibility the synthetic boundary must be emitted as an explicit structural root with `parent: null` and `message: null`; omitting those fields is not equivalent, because downstream ingestion distinguishes an intentional structural null from an incomplete provider node.
 - Unknown conversation-level fields are deliberately omitted: they may contain information from outside the interval. Source-window timestamps are not misrepresented as segment timestamps.
 - Off-path tool/analysis nodes, alternate answers, edits and branches may therefore be absent. Keep a separate full raw export when complete provenance is required. Do not silently delete existing full sources after acquiring a segment.
 - Attachments are pointers only, not archived binaries. Selected messages can themselves quote earlier conversation; this is graph trimming, not semantic redaction.
@@ -101,3 +103,13 @@ The importer has previously ignored custom top-level session metadata. Preserve 
 Build success, download request, local file verification, Root Cellar acquisition, conversational reintegration and Git merge are distinct events. This PR performs none of the latter events automatically.
 
 Deferred: Mainline Delta, archive acknowledgement/cursors, Recent Ledger, automatic compaction, automatic reminders, title-only PATCH allowance, complete multi-branch archival and exporter/Root Cellar schema adapter.
+
+## First W02 import finding — 2026-09-17
+
+After conversational reintegration, the final archived W02 artifact was compared with the accepted Root Cellar parser v0.2 contract.
+
+Observed source fact: the archived v2 artifact's synthetic boundary omitted both `parent` and `message` fields. Static comparison with parser v0.2 predicts an error for the absent message field and unresolved current-path membership for the missing parent field. The actual parser CLI has not yet been run on W02 in an executor, so this remains a code-derived prediction rather than an executed test result.
+
+The exporter source and smoke assertion were updated on PR #1 after this finding so future synthetic boundaries emit explicit `parent: null` and `message: null`. The historical W02 bytes are not rewritten; their registered hash remains the identity of the first dogfood artifact.
+
+The current PR head after this fix has **not** yet been revalidated by TypeScript/tests/ESLint/build/browser execution. Earlier green browser/build evidence belongs to the earlier tested head and must not be inherited by the changed head.
