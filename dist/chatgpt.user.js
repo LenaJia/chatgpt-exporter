@@ -1,15 +1,17 @@
 // ==UserScript==
-// @name               ChatGPT Exporter
-// @name:zh-CN         ChatGPT Exporter
-// @name:zh-TW         ChatGPT Exporter
-// @namespace          pionxzh
-// @version            2.35.0
+// @name               ChatGPT Exporter — Root Cellar Test
+// @name:zh-CN         ChatGPT Exporter — Root Cellar 测试版
+// @name:zh-TW         ChatGPT Exporter — Root Cellar 測試版
+// @namespace          lena-rootcellar-exporter-test
+// @version            2.35.0-rootcellar.2
 // @author             pionxzh
 // @description        Export ChatGPT conversations with one click — backup & share effortlessly!
 // @description:zh-CN  一键导出 ChatGPT 对话，轻松备份与分享
 // @description:zh-TW  一鍵導出 ChatGPT 對話，輕鬆備份與分享
 // @license            MIT
 // @icon               https://chatgpt.com/favicon.ico
+// @downloadURL        none
+// @updateURL          none
 // @match              https://chat.openai.com/
 // @match              https://chat.openai.com/?*
 // @match              https://chat.openai.com/c/*
@@ -8565,6 +8567,8 @@ html {
     Setting: Setting$8,
     Language: Language$8,
     "Copy Text": "Copy Text",
+    "Mark Work Start": "Mark Work Start",
+    "Export Work Segment": "Export Work Segment",
     "Copied!": "Copied!",
     Screenshot: Screenshot$8,
     Markdown: Markdown$8,
@@ -9125,6 +9129,8 @@ html {
     Setting: Setting$1,
     Language: Language$1,
     "Copy Text": "复制文字",
+    "Mark Work Start": "标记 Work 起点",
+    "Export Work Segment": "导出 Work 分段",
     "Copied!": "已复制!",
     Screenshot: Screenshot$1,
     Markdown: Markdown$1,
@@ -9205,6 +9211,8 @@ html {
     Setting,
     Language,
     "Copy Text": "複製文字",
+    "Mark Work Start": "標記 Work 起點",
+    "Export Work Segment": "匯出 Work 分段",
     "Copied!": "已複製!",
     Screenshot,
     Markdown,
@@ -22284,6 +22292,298 @@ ${content2.text}
     }
     return JSON.stringify(oobaData, null, 2);
   }
+  function isWorkSessionMarker(value) {
+    if (!value || typeof value !== "object") return false;
+    const m2 = value;
+    return m2.schemaVersion === 2 && ["sessionId", "goal", "sourceConversationId", "sourceTitle", "boundaryNodeId", "markedAt"].every((key2) => typeof m2[key2] === "string" && String(m2[key2]).trim().length > 0) && /^ws-[0-9a-f-]{36}$/i.test(m2.sessionId) && Number.isFinite(Date.parse(m2.markedAt)) && (m2.parentConversationId === null || typeof m2.parentConversationId === "string") && (m2.boundaryMessageId === null || typeof m2.boundaryMessageId === "string") && ["explicit_boundary", "retroactive_user_match"].includes(m2.markerBasis) && ["boundConversationId", "firstNodeId", "latestEndNodeId", "latestDownloadRequestedAt"].every((key2) => m2[key2] === void 0 || typeof m2[key2] === "string");
+  }
+  function currentPathNodeIds(conversation) {
+    if (!conversation.id || !conversation.current_node || !conversation.mapping) throw new Error("Conversation identity or current path is missing.");
+    const path2 = [];
+    const visited = /* @__PURE__ */ new Set();
+    let nodeId = conversation.current_node;
+    while (nodeId) {
+      if (visited.has(nodeId)) throw new Error(`Conversation ancestry contains a cycle at ${nodeId}.`);
+      visited.add(nodeId);
+      const node2 = Object.hasOwn(conversation.mapping, nodeId) ? conversation.mapping[nodeId] : void 0;
+      if (!node2 || node2.id !== nodeId) throw new Error(`Conversation ancestry references missing or mismatched node ${nodeId}.`);
+      if (node2.parent != null && (typeof node2.parent !== "string" || !node2.parent)) throw new Error("Invalid parent locator.");
+      path2.push(nodeId);
+      nodeId = node2.parent;
+    }
+    return path2.reverse();
+  }
+  function messageText(node2) {
+    var _a;
+    const content2 = (_a = node2.message) == null ? void 0 : _a.content;
+    const parts = content2 && "parts" in content2 ? content2.parts : null;
+    if (!Array.isArray(parts)) return "";
+    return parts.map((part) => {
+      if (typeof part === "string") return part;
+      if (part && typeof part === "object" && "text" in part && typeof part.text === "string") return part.text;
+      return "";
+    }).join("\n");
+  }
+  function createWorkSessionMarker(conversation, goal) {
+    var _a;
+    currentPathNodeIds(conversation);
+    if (!goal.trim()) throw new Error("Work goal cannot be empty.");
+    const boundary = conversation.mapping[conversation.current_node];
+    return {
+      schemaVersion: 2,
+      sessionId: `ws-${crypto.randomUUID()}`,
+      goal: goal.trim(),
+      sourceConversationId: conversation.id,
+      sourceTitle: conversation.title || "ChatGPT Conversation",
+      parentConversationId: conversation.id,
+      boundaryNodeId: boundary.id,
+      boundaryMessageId: ((_a = boundary.message) == null ? void 0 : _a.id) ?? null,
+      markedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      markerBasis: "explicit_boundary"
+    };
+  }
+  function createRetroactiveWorkSessionMarker(conversation, goal, firstMessageSnippet) {
+    const snippet = firstMessageSnippet.trim().toLowerCase();
+    if (!snippet) throw new Error("The first Work message snippet cannot be empty.");
+    const matches = currentPathNodeIds(conversation).map((id) => conversation.mapping[id]).filter((node2) => {
+      var _a;
+      return ((_a = node2.message) == null ? void 0 : _a.author.role) === "user" && messageText(node2).toLowerCase().includes(snippet);
+    });
+    if (matches.length !== 1) throw new Error("The phrase must match exactly one user message on the current path. Use a longer unique phrase.");
+    const first = matches[0];
+    if (!first.parent) throw new Error("The matched message has no parent boundary.");
+    const marker = createWorkSessionMarker({ ...conversation, current_node: first.parent }, goal);
+    return {
+      ...marker,
+      parentConversationId: null,
+      markerBasis: "retroactive_user_match",
+      boundConversationId: conversation.id,
+      firstNodeId: first.id
+    };
+  }
+  function segmentNodeIds(conversation, marker) {
+    var _a;
+    if (!isWorkSessionMarker(marker)) throw new Error("Invalid or legacy Work marker; recover the start explicitly.");
+    if (marker.boundConversationId && marker.boundConversationId !== conversation.id) throw new Error("This session is bound to another Work conversation.");
+    const path2 = currentPathNodeIds(conversation);
+    const boundaryIndex = path2.indexOf(marker.boundaryNodeId);
+    if (boundaryIndex < 0) throw new Error("The Work boundary is not on the current conversation path.");
+    if ((((_a = conversation.mapping[marker.boundaryNodeId].message) == null ? void 0 : _a.id) ?? null) !== marker.boundaryMessageId) throw new Error("The boundary message identity changed.");
+    const ids = path2.slice(boundaryIndex + 1);
+    if (!ids.length) throw new Error("No Work messages exist after the marked boundary yet.");
+    if (marker.firstNodeId && ids[0] !== marker.firstNodeId) throw new Error("The first Work node changed; recover this branch as a separate session.");
+    if (marker.latestEndNodeId && !ids.includes(marker.latestEndNodeId)) throw new Error("The previously exported end is absent. This is a divergent or shortened path; recover a separate session.");
+    return ids;
+  }
+  function compatibleWorkSessionMarkers(conversation, markers) {
+    currentPathNodeIds(conversation);
+    return markers.filter((marker) => {
+      try {
+        segmentNodeIds(conversation, marker);
+        return true;
+      } catch {
+        return false;
+      }
+    }).sort((a2, b2) => b2.markedAt.localeCompare(a2.markedAt));
+  }
+  function buildWorkSegment(conversation, marker, exportedAt = (/* @__PURE__ */ new Date()).toISOString(), displayTitle = `Work｜${marker.goal}`) {
+    var _a, _b;
+    const ids = segmentNodeIds(conversation, marker);
+    const first = ids[0];
+    const end = ids[ids.length - 1];
+    const mapping = /* @__PURE__ */ Object.create(null);
+    mapping[marker.boundaryNodeId] = { id: marker.boundaryNodeId, children: [first] };
+    ids.forEach((id, index2) => {
+      const node2 = structuredClone(conversation.mapping[id]);
+      node2.children = index2 + 1 < ids.length ? [ids[index2 + 1]] : [];
+      mapping[id] = node2;
+    });
+    return {
+      id: conversation.id,
+      conversation_id: conversation.id,
+      title: displayTitle.trim() || `Work｜${marker.goal}`,
+      current_node: end,
+      mapping,
+      rootcellar_work_segment: {
+        schema: "rootcellar-work-segment-v2",
+        artifact_kind: "derived_current_path_projection",
+        session_id: marker.sessionId,
+        goal: marker.goal,
+        display_title: displayTitle.trim() || `Work｜${marker.goal}`,
+        source_conversation_id: conversation.id,
+        parent_conversation_id: marker.parentConversationId,
+        marker_conversation_id: marker.sourceConversationId,
+        source_title: conversation.title,
+        marker_basis: marker.markerBasis,
+        branch_from_node_id: marker.boundaryNodeId,
+        branch_from_message_id: marker.boundaryMessageId,
+        start_node_id: first,
+        start_message_id: ((_a = mapping[first].message) == null ? void 0 : _a.id) ?? null,
+        end_node_id: end,
+        end_message_id: ((_b = mapping[end].message) == null ? void 0 : _b.id) ?? null,
+        marked_at: marker.markedAt,
+        exported_at: exportedAt,
+        export_mode: "exclusive_after_boundary",
+        original_mapping_node_count: Object.keys(conversation.mapping).length,
+        source_path_node_count: currentPathNodeIds(conversation).length,
+        segment_node_count: ids.length,
+        exported_mapping_node_count: ids.length + 1,
+        boundary_is_synthetic: true,
+        attachments_archived: false,
+        archive_status: "unverified"
+      }
+    };
+  }
+  function buildWorkSegmentFileName(marker, exportedAt = (/* @__PURE__ */ new Date()).toISOString(), displayTitle = `Work｜${marker.goal}`) {
+    const label = sanitize$1(displayTitle.trim()).replace(/\s+/g, "-").slice(0, 50) || "work-session";
+    const stamp = exportedAt.replace(/[^0-9]/g, "");
+    return `${label}_${marker.sessionId}_${stamp}.json`;
+  }
+  const KEY = "rootcellar:work_session_markers:v2";
+  function loadWorkSessionMarkers() {
+    if (typeof _GM_getValue !== "function" || typeof _GM_setValue !== "function") throw new Error("Persistent userscript storage is unavailable. Install in Tampermonkey; no in-memory marker will be used.");
+    const raw2 = _GM_getValue(KEY, null);
+    if (raw2 === null) return [];
+    if (typeof raw2 !== "string") throw new Error("Work marker storage has an invalid encoding; it will not be overwritten.");
+    const value = JSON.parse(raw2);
+    if (!Array.isArray(value) || !value.every(isWorkSessionMarker)) throw new Error("Work marker storage is invalid. Back it up before repairing; it will not be overwritten.");
+    return value;
+  }
+  function saveWorkSessionMarker(marker) {
+    if (!isWorkSessionMarker(marker)) throw new Error("Invalid Work marker.");
+    const markers = loadWorkSessionMarkers().filter((item) => item.sessionId !== marker.sessionId);
+    markers.push(marker);
+    _GM_setValue(KEY, JSON.stringify(markers));
+    if (JSON.stringify(loadWorkSessionMarkers()) !== JSON.stringify(markers)) throw new Error("Work marker persistence could not be verified.");
+  }
+  function findCompatibleWorkSessionMarkers(conversation) {
+    return compatibleWorkSessionMarkers(conversation, loadWorkSessionMarkers());
+  }
+  function askForWorkGoal() {
+    var _a;
+    const goal = (_a = window.prompt("本次 Work 的简短目标 / Short Work goal:")) == null ? void 0 : _a.trim();
+    return goal || null;
+  }
+  let workActionBusy = false;
+  async function runWorkAction(action) {
+    if (workActionBusy) return false;
+    workActionBusy = true;
+    try {
+      return await action();
+    } catch (error2) {
+      alert(error2 instanceof Error ? error2.message : String(error2));
+      return false;
+    } finally {
+      workActionBusy = false;
+    }
+  }
+  async function fetchWorkConversation() {
+    const chatId = getChatIdFromUrl();
+    if (!chatId || location.pathname.startsWith("/share") || isTemporaryChat()) throw new Error("Work markers require a saved conversation URL, not a new, shared or temporary chat. Wait for its /c/ URL.");
+    const conversation = await fetchConversation(chatId, false);
+    await verifyWorkLocation(chatId);
+    return { chatId, conversation };
+  }
+  async function verifyWorkLocation(chatId) {
+    if (getChatIdFromUrl() !== chatId || location.pathname.startsWith("/share") || isTemporaryChat()) throw new Error("The conversation changed while loading. Please retry in the intended window.");
+  }
+  function markWorkSegmentStart() {
+    return runWorkAction(markWorkSegmentStartInner);
+  }
+  async function markWorkSegmentStartInner() {
+    if (!checkIfConversationStarted()) {
+      alert("请先开始对话 / Please start a conversation first");
+      return false;
+    }
+    const goal = askForWorkGoal();
+    if (!goal) return false;
+    const { chatId, conversation } = await fetchWorkConversation();
+    const marker = createWorkSessionMarker(conversation, goal);
+    const preview = messageText(conversation.mapping[marker.boundaryNodeId]).slice(0, 300);
+    if (!window.confirm(`确认切出点 / Confirm boundary
+${conversation.title}
+${marker.boundaryNodeId}
+${preview}
+
+这条消息不包含在 Work 导出中。仅导出之后的当前路径。请等待回复生成结束再标记。`)) return false;
+    await verifyWorkLocation(chatId);
+    saveWorkSessionMarker(marker);
+    alert(`Work start marked.
+
+${marker.sessionId}
+Boundary: ${marker.boundaryNodeId}`);
+    return true;
+  }
+  function exportWorkSegment() {
+    return runWorkAction(exportWorkSegmentInner);
+  }
+  async function exportWorkSegmentInner() {
+    var _a, _b;
+    if (!checkIfConversationStarted()) {
+      alert("请先开始对话 / Please start a conversation first");
+      return false;
+    }
+    const { chatId, conversation } = await fetchWorkConversation();
+    const candidates = findCompatibleWorkSessionMarkers(conversation);
+    let marker;
+    if (candidates.length) {
+      const choice = window.prompt(`选择本次 Work，不能仅凭祖先节点自动判定。
+Select session, or 0 to recover a different start:
+${candidates.map((item, index2) => `${index2 + 1}. ${item.goal} | ${item.markedAt} | ${item.sessionId}`).join("\n")}`, "");
+      if (choice === null) return false;
+      if (!/^\d+$/.test(choice.trim()) || Number(choice) > candidates.length) throw new Error("Invalid session selection.");
+      if (Number(choice) > 0) marker = candidates[Number(choice) - 1];
+    }
+    if (!marker) {
+      const goal = askForWorkGoal();
+      if (!goal) return false;
+      const snippet = (_a = window.prompt("No compatible Work marker was found. Paste a unique phrase from the first user message in this Work session:")) == null ? void 0 : _a.trim();
+      if (!snippet) return false;
+      try {
+        marker = createRetroactiveWorkSessionMarker(conversation, goal, snippet);
+      } catch (error2) {
+        alert(error2 instanceof Error ? error2.message : String(error2));
+        return false;
+      }
+    }
+    try {
+      const displayTitle = (_b = window.prompt("导出显示名（可与窗口一致，例如 W02｜根窖接线）/ Export label:", `Work｜${marker.goal}`)) == null ? void 0 : _b.trim();
+      if (!displayTitle) return false;
+      const segment = buildWorkSegment(conversation, marker, (/* @__PURE__ */ new Date()).toISOString(), displayTitle);
+      const meta = segment.rootcellar_work_segment;
+      const first = segment.mapping[meta.start_node_id];
+      const last = segment.mapping[meta.end_node_id];
+      if (!window.confirm(`${displayTitle}
+${marker.sessionId}
+源窗口 / Source: ${conversation.title}
+父窗口 / Parent: ${meta.parent_conversation_id ?? "unknown（未核验）"}
+节点 / Nodes: ${meta.segment_node_count}
+
+START ${meta.start_node_id}
+${messageText(first).slice(0, 350)}
+
+END ${meta.end_node_id}
+${messageText(last).slice(0, 350)}
+
+仅为当前路径的派生快照，不含兄弟分支；附件未归档。请核对首尾并确认回复已结束。继续下载？`)) return false;
+      await verifyWorkLocation(chatId);
+      saveWorkSessionMarker({ ...marker, boundConversationId: conversation.id, firstNodeId: meta.start_node_id });
+      const content2 = JSON.stringify([segment], null, 2);
+      downloadFile(buildWorkSegmentFileName(marker, meta.exported_at, displayTitle), "application/json", content2);
+      saveWorkSessionMarker({
+        ...marker,
+        boundConversationId: conversation.id,
+        firstNodeId: meta.start_node_id,
+        latestDownloadRequestedAt: meta.exported_at,
+        latestEndNodeId: meta.end_node_id
+      });
+      alert("下载已请求；请检查文件。浏览器下载不等于根窖已归档。可重复导出整段 Work，不会推进归档游标。");
+      return true;
+    } catch (error2) {
+      alert(error2 instanceof Error ? error2.message : String(error2));
+      return false;
+    }
+  }
   async function exportToJson(fileNameFormat) {
     if (!checkIfConversationStarted()) {
       alert(instance.t("Please start a conversation first"));
@@ -24628,6 +24928,8 @@ ${content2}`;
     const onClickOfficialJSON = T$4(() => exportToJson(format), [format]);
     const onClickTavern = T$4(() => exportToTavern(format), [format]);
     const onClickOoba = T$4(() => exportToOoba(format), [format]);
+    const onClickMarkWorkStart = T$4(() => markWorkSegmentStart(), []);
+    const onClickExportWorkSegment = T$4(() => exportWorkSegment(), []);
     const width = useWindowResize(() => window.innerWidth);
     const isMobile = width < 768;
     const isCollapsedSidebar = useCollapsedSidebar(container, isMobile);
@@ -24703,6 +25005,24 @@ ${content2}`;
                           icon: IconCopy,
                           className: "row-full",
                           onClick: onClickText
+                        }
+                      ),
+                      /* @__PURE__ */ o$8(
+                        MenuItem,
+                        {
+                          text: t2("Mark Work Start"),
+                          icon: IconArrowRightFromBracket,
+                          className: "row-half",
+                          onClick: onClickMarkWorkStart
+                        }
+                      ),
+                      /* @__PURE__ */ o$8(
+                        MenuItem,
+                        {
+                          text: t2("Export Work Segment"),
+                          icon: IconJSON,
+                          className: "row-half",
+                          onClick: onClickExportWorkSegment
                         }
                       ),
                       /* @__PURE__ */ o$8(

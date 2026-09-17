@@ -1,33 +1,29 @@
-import { KEY_ROOTCELLAR_WORK_SESSION_MARKERS } from '../constants'
-import { ScriptStorage } from '../utils/storage'
-import { currentPathNodeIds } from './workSegment'
+import { GM_getValue, GM_setValue } from 'vite-plugin-monkey/dist/client'
+import { compatibleWorkSessionMarkers, isWorkSessionMarker } from './workSegment'
 import type { WorkSessionMarker } from './workSegment'
 import type { ApiConversationWithId } from '../api'
 
-const MAX_MARKERS = 50
+// Preserve v1 bytes; its ambiguous provenance requires explicit recovery into v2.
+const KEY = 'rootcellar:work_session_markers:v2'
 
 export function loadWorkSessionMarkers(): WorkSessionMarker[] {
-    const value = ScriptStorage.get<WorkSessionMarker[]>(KEY_ROOTCELLAR_WORK_SESSION_MARKERS)
-    if (!Array.isArray(value)) return []
-    return value.filter(marker => marker?.schemaVersion === 1)
+    if (typeof GM_getValue !== 'function' || typeof GM_setValue !== 'function') throw new Error('Persistent userscript storage is unavailable. Install in Tampermonkey; no in-memory marker will be used.')
+    const raw = GM_getValue<unknown>(KEY, null)
+    if (raw === null) return []
+    if (typeof raw !== 'string') throw new Error('Work marker storage has an invalid encoding; it will not be overwritten.')
+    const value: unknown = JSON.parse(raw)
+    if (!Array.isArray(value) || !value.every(isWorkSessionMarker)) throw new Error('Work marker storage is invalid. Back it up before repairing; it will not be overwritten.')
+    return value
 }
 
 export function saveWorkSessionMarker(marker: WorkSessionMarker): void {
+    if (!isWorkSessionMarker(marker)) throw new Error('Invalid Work marker.')
     const markers = loadWorkSessionMarkers().filter(item => item.sessionId !== marker.sessionId)
     markers.push(marker)
-    markers.sort((a, b) => a.markedAt.localeCompare(b.markedAt))
-    ScriptStorage.set(KEY_ROOTCELLAR_WORK_SESSION_MARKERS, markers.slice(-MAX_MARKERS))
+    GM_setValue(KEY, JSON.stringify(markers))
+    if (JSON.stringify(loadWorkSessionMarkers()) !== JSON.stringify(markers)) throw new Error('Work marker persistence could not be verified.')
 }
 
-export function findCompatibleWorkSessionMarker(conversation: ApiConversationWithId): WorkSessionMarker | null {
-    const path = new Set(currentPathNodeIds(conversation))
-    const compatible = loadWorkSessionMarkers()
-        .filter(marker => path.has(marker.boundaryNodeId))
-        .sort((a, b) => {
-            const recencyDelta = b.markedAt.localeCompare(a.markedAt)
-            if (recencyDelta) return recencyDelta
-            return Number(b.sourceConversationId === conversation.id)
-                - Number(a.sourceConversationId === conversation.id)
-        })
-    return compatible[0] ?? null
+export function findCompatibleWorkSessionMarkers(conversation: ApiConversationWithId): WorkSessionMarker[] {
+    return compatibleWorkSessionMarkers(conversation, loadWorkSessionMarkers())
 }

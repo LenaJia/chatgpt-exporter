@@ -2,13 +2,6 @@ import JSZip from 'jszip'
 import { fetchConversation, getCurrentChatId, processConversation } from '../api'
 import i18n from '../i18n'
 import { checkIfConversationStarted } from '../page'
-import {
-    buildWorkSegment,
-    buildWorkSegmentFileName,
-    createRetroactiveWorkSessionMarker,
-    createWorkSessionMarker,
-} from '../rootcellar/workSegment'
-import { findCompatibleWorkSessionMarker, saveWorkSessionMarker } from '../rootcellar/workSessionStorage'
 import { checkIfTemporaryChatIsExportable } from '../temporaryChat'
 import { convertToOoba, convertToTavern } from '../utils/conversion'
 import { buildJsonBatchFileName, buildZipFileName, downloadFile, getFileNameWithFormat } from '../utils/download'
@@ -16,80 +9,7 @@ import type { ApiConversationWithId } from '../api'
 import type { ExportMeta } from '../ui/SettingContext'
 import type { PartInfo } from '../utils/download'
 
-function askForWorkGoal(): string | null {
-    const goal = window.prompt('Short goal for this Work session (used for the export name):')?.trim()
-    return goal || null
-}
-
-export async function markWorkSegmentStart() {
-    if (!checkIfConversationStarted()) {
-        alert(i18n.t('Please start a conversation first'))
-        return false
-    }
-
-    if (!checkIfTemporaryChatIsExportable()) {
-        alert(i18n.t('Temporary chat could not be captured'))
-        return false
-    }
-
-    const goal = askForWorkGoal()
-    if (!goal) return false
-
-    const chatId = await getCurrentChatId()
-    const conversation = await fetchConversation(chatId, false)
-    const marker = createWorkSessionMarker(conversation, goal)
-    saveWorkSessionMarker(marker)
-    alert(`Work start marked.\n\n${marker.sessionId}\nBoundary: ${marker.boundaryNodeId}`)
-    return true
-}
-
-export async function exportWorkSegment() {
-    if (!checkIfConversationStarted()) {
-        alert(i18n.t('Please start a conversation first'))
-        return false
-    }
-
-    if (!checkIfTemporaryChatIsExportable()) {
-        alert(i18n.t('Temporary chat could not be captured'))
-        return false
-    }
-
-    const chatId = await getCurrentChatId()
-    const conversation = await fetchConversation(chatId, false)
-    let marker = findCompatibleWorkSessionMarker(conversation)
-
-    if (!marker) {
-        const goal = askForWorkGoal()
-        if (!goal) return false
-        const snippet = window.prompt('No compatible Work marker was found. Paste a unique phrase from the first user message in this Work session:')?.trim()
-        if (!snippet) return false
-
-        try {
-            marker = createRetroactiveWorkSessionMarker(conversation, goal, snippet)
-            saveWorkSessionMarker(marker)
-        }
-        catch (error) {
-            alert(error instanceof Error ? error.message : String(error))
-            return false
-        }
-    }
-
-    try {
-        const segment = buildWorkSegment(conversation, marker)
-        const content = JSON.stringify([segment], null, 2)
-        downloadFile(buildWorkSegmentFileName(marker), 'application/json', content)
-        saveWorkSessionMarker({
-            ...marker,
-            latestExportAt: segment.rootcellar_work_segment.exported_at,
-            latestEndNodeId: segment.rootcellar_work_segment.end_node_id,
-        })
-        return true
-    }
-    catch (error) {
-        alert(error instanceof Error ? error.message : String(error))
-        return false
-    }
-}
+export { exportWorkSegment, markWorkSegmentStart } from './workSegment'
 
 export async function exportToJson(fileNameFormat: string) {
     if (!checkIfConversationStarted()) {
