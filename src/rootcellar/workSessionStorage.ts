@@ -24,9 +24,10 @@ export function findCompatibleWorkSessionMarker(conversation: ApiConversationWit
     const compatible = loadWorkSessionMarkers()
         .filter(marker => path.has(marker.boundaryNodeId))
         .sort((a, b) => {
-            const exactConversationDelta = Number(b.sourceConversationId === conversation.id)
+            const recencyDelta = b.markedAt.localeCompare(a.markedAt)
+            if (recencyDelta) return recencyDelta
+            return Number(b.sourceConversationId === conversation.id)
                 - Number(a.sourceConversationId === conversation.id)
-            return exactConversationDelta || b.markedAt.localeCompare(a.markedAt)
         })
     return compatible[0] ?? null
 }
