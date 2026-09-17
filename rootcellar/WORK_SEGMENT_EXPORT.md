@@ -96,9 +96,9 @@ git diff --check
 
 ## Root Cellar import and return boundary
 
-The previous v1 bounded mapping was smoke-tested against parser v0.2. This revised v2 allowlisted projection has NOT yet been validated end-to-end against the actual Root Cellar importer. Do not inherit v1's pass as a v2 pass.
+The first final v2 W02 artifact has now been executed through frozen Root Cellar parser v0.2. The historical artifact is **not** a clean canonical build because its synthetic boundary omitted two fields required by the canonical structural-root contract.
 
-The importer has previously ignored custom top-level session metadata. Preserve the downloaded artifact and reconcile its exporter UUID with the existing Root Cellar session ID through an explicit relation/manifest mapping; do not overwrite either identity. Hash, verify coverage and register source locations before claiming archival. Synthetic boundary content must not be mistaken for an original empty message or deduplicated over the real parent message.
+The importer preserves custom top-level session metadata only indirectly through the source artifact; reconcile exporter UUID with the existing Root Cellar session ID through the explicit relation/manifest mapping already recorded in Root Cellar. Do not overwrite either identity. Synthetic boundary content must not be mistaken for an original provider message or deduplicated over the real parent message.
 
 Build success, download request, local file verification, Root Cellar acquisition, conversational reintegration and Git merge are distinct events. This PR performs none of the latter events automatically.
 
@@ -106,10 +106,26 @@ Deferred: Mainline Delta, archive acknowledgement/cursors, Recent Ledger, automa
 
 ## First W02 import finding — 2026-09-17
 
-After conversational reintegration, the final archived W02 artifact was compared with the accepted Root Cellar parser v0.2 contract.
+After conversational reintegration, the final archived W02 artifact was run through the exact frozen Root Cellar parser v0.2.
 
-Observed source fact: the archived v2 artifact's synthetic boundary omitted both `parent` and `message` fields. Static comparison with parser v0.2 predicts an error for the absent message field and unresolved current-path membership for the missing parent field. The actual parser CLI has not yet been run on W02 in an executor, so this remains a code-derived prediction rather than an executed test result.
+Verified identities:
 
-The exporter source and smoke assertion were updated on PR #1 after this finding so future synthetic boundaries emit explicit `parent: null` and `message: null`. The historical W02 bytes are not rewritten; their registered hash remains the identity of the first dogfood artifact.
+- W02 SHA-256: `118bb65c1d64bed7d76e6793ee93331ffdee3dc9adc76a6bcc82ba560e1edf7a`;
+- frozen parser Git blob SHA-1: `98fdec7015fd9c53a18bb31d3a55928dcbe78e05`;
+- frozen parser SHA-256: `441760769cf0ecc031adfc2b5fbb94b288a3d0164d8f9acfa230bf8f00a84324`.
 
-The current PR head after this fix has **not** yet been revalidated by TypeScript/tests/ESLint/build/browser execution. Earlier green browser/build evidence belongs to the earlier tested head and must not be inherited by the changed head.
+Executed parser result:
+
+- exit code `2`;
+- 919 records;
+- 918 projected, 1 quarantined;
+- one `UNSUPPORTED_PROVIDER_STRUCTURE` error (`Message field is absent`);
+- one `VISIBILITY_UNKNOWN` warning;
+- all 919 records have `current_path_membership = unknown`;
+- `has_errors=true`, `review_status=requires_review`.
+
+The sole quarantined node is the exporter-created synthetic boundary. Its absent `message` field causes the canonical error; its absent `parent` field prevents the frozen parser from proving a complete current ancestry chain.
+
+The exporter **source** and smoke assertion were updated on PR #1 so future synthetic boundaries emit explicit `parent: null` and `message: null`. The historical W02 bytes are not rewritten; their registered hash remains the identity of the first dogfood artifact.
+
+Important build-state boundary: the current `dist/chatgpt.user.js` is still the previous build and still emits the old `{ id, children }` synthetic boundary. The current PR head has **not** yet been revalidated by TypeScript/tests/ESLint/build/browser execution after the source fix. Earlier green browser/build evidence belongs to the earlier tested head and must not be inherited by the changed head. A new build must regenerate `dist` before any browser claim is made.
