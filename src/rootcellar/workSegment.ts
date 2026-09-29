@@ -24,13 +24,13 @@ export function isWorkSessionMarker(value: unknown): value is WorkSessionMarker 
     return m.schemaVersion === 2
         && ['sessionId', 'goal', 'sourceConversationId', 'sourceTitle', 'boundaryNodeId', 'markedAt']
             .every(key => typeof m[key as keyof WorkSessionMarker] === 'string' && String(m[key as keyof WorkSessionMarker]).trim().length > 0)
-        && /^ws-[0-9a-f-]{36}$/i.test(m.sessionId)
-        && Number.isFinite(Date.parse(m.markedAt))
-        && (m.parentConversationId === null || typeof m.parentConversationId === 'string')
-        && (m.boundaryMessageId === null || typeof m.boundaryMessageId === 'string')
-        && ['explicit_boundary', 'retroactive_user_match'].includes(m.markerBasis)
-        && ['boundConversationId', 'firstNodeId', 'latestEndNodeId', 'latestDownloadRequestedAt']
-            .every(key => m[key as keyof WorkSessionMarker] === undefined || typeof m[key as keyof WorkSessionMarker] === 'string')
+            && /^ws-[0-9a-f-]{36}$/i.test(m.sessionId)
+            && Number.isFinite(Date.parse(m.markedAt))
+            && (m.parentConversationId === null || typeof m.parentConversationId === 'string')
+            && (m.boundaryMessageId === null || typeof m.boundaryMessageId === 'string')
+            && ['explicit_boundary', 'retroactive_user_match'].includes(m.markerBasis)
+            && ['boundConversationId', 'firstNodeId', 'latestEndNodeId', 'latestDownloadRequestedAt']
+                .every(key => m[key as keyof WorkSessionMarker] === undefined || typeof m[key as keyof WorkSessionMarker] === 'string')
 }
 
 export function currentPathNodeIds(conversation: ApiConversationWithId): string[] {
