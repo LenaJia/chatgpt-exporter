@@ -23,6 +23,7 @@ function textNode(id: string, parent: string | undefined, role: 'user' | 'assist
             content: { content_type: 'text', parts: [text] },
             metadata: {},
             recipient: 'all',
+            status: 'finished_successfully',
             weight: 1,
         },
     }
