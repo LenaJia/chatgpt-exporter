@@ -26,7 +26,8 @@
     "test": "tsc --noEmit && vitest run",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:work": "node tests/run.mjs"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.14",
