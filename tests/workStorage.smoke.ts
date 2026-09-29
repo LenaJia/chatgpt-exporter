@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { loadWorkSessionMarkers, saveWorkSessionMarker } from '../src/rootcellar/workSessionStorage'
-import { setFailWrites, values } from './gm.mock'
 import type { WorkSessionMarker } from '../src/rootcellar/workSegment'
+import { setFailWrites, values } from './gm.mock'
 
 const key = 'rootcellar:work_session_markers:v2'
 const marker: WorkSessionMarker = {
