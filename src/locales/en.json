@@ -61,5 +61,7 @@
   "All conversations": "All conversations",
   "Load more conversations": "Load {{n}} more",
   "Load more conversations remaining": "Load {{n}} more · {{remaining}} left",
-  "Export Skipped Message": "{{n}} conversations failed after repeated retries and are missing from the export:"
+  "Export Skipped Message": "{{n}} conversations failed after repeated retries and are missing from the export:",
+  "Mark Work Start": "Mark Work Start",
+  "Export Work Segment": "Export Work Segment"
 }
