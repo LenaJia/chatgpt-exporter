@@ -7,7 +7,7 @@ export const state = {
     temporary: false,
     fetches: 0,
     duringFetch: () => {},
-    downloads: [] as Array<{ name: string; content: string }>,
+    downloads: [] as Array<{ name: string, content: string }>,
 }
 export function getChatIdFromUrl() {
     return state.urlId
