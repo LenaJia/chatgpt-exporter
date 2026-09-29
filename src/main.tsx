@@ -199,6 +199,17 @@ function getNavMenuInsertionTarget(target: Element) {
 }
 
 function getNavMenuMounts(): NavMenuMount[] {
+    // Prefer the redesigned navigation rail's footer menu over the profile
+    // button. Mounting relative to the profile can overlap the account label
+    // in expanded-sidebar variants.
+    const railMenuButton = document.querySelector(RAIL_MENU_BUTTON_SELECTOR)
+    if (railMenuButton) {
+        return [{
+            target: railMenuButton,
+            insert: container => getNavMenuInsertionTarget(railMenuButton).before(container),
+        }]
+    }
+
     const profileButtons = Array.from(document.querySelectorAll(PROFILE_BUTTON_SELECTOR))
     if (profileButtons.length > 0) {
         return profileButtons.map(target => ({
@@ -215,15 +226,6 @@ function getNavMenuMounts(): NavMenuMount[] {
             target,
             insert: container => target.prepend(container),
         }))
-    }
-
-    // Place the menu above the first footer menu, which is the help menu.
-    const railMenuButton = document.querySelector(RAIL_MENU_BUTTON_SELECTOR)
-    if (railMenuButton) {
-        return [{
-            target: railMenuButton,
-            insert: container => getNavMenuInsertionTarget(railMenuButton).before(container),
-        }]
     }
 
     return Array.from(document.querySelectorAll(AUTOMATIONS_SELECTOR)).map(target => ({
