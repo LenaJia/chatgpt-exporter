@@ -42,6 +42,7 @@ state.conversation = {
                 content: { content_type: 'text', parts: ['unique work start'] },
                 metadata: {},
                 recipient: 'all',
+                status: 'finished_successfully',
                 weight: 1,
             },
         },
