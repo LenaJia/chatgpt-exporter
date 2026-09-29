@@ -20,7 +20,7 @@ export default defineConfig({
                 },
                 'author': packageJson.author,
                 'namespace': 'lena-rootcellar-exporter-test',
-                'version': '2.36.1-rootcellar.2',
+                'version': '2.36.1-rootcellar.3',
                 // Keep this local test build isolated from upstream auto-update.
                 'downloadURL': 'none',
                 'updateURL': 'none',
