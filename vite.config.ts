@@ -14,12 +14,16 @@ export default defineConfig({
             entry: 'src/main.tsx',
             userscript: {
                 'name': {
-                    '': packageJson.title,
-                    'zh-CN': packageJson['title:zh-CN'],
-                    'zh-TW': packageJson['title:zh-TW'],
+                    '': 'ChatGPT Exporter — Root Cellar Test',
+                    'zh-CN': 'ChatGPT Exporter — Root Cellar 测试版',
+                    'zh-TW': 'ChatGPT Exporter — Root Cellar 測試版',
                 },
                 'author': packageJson.author,
-                'namespace': packageJson.author,
+                'namespace': 'lena-rootcellar-exporter-test',
+                'version': '2.36.1-rootcellar.1',
+                // Keep this local test build isolated from upstream auto-update.
+                'downloadURL': 'none',
+                'updateURL': 'none',
                 'description': {
                     '': packageJson.description,
                     'zh-CN': packageJson['description:zh-CN'],
