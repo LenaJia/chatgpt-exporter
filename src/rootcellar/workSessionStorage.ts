@@ -1,7 +1,7 @@
 import { GM_getValue, GM_setValue } from 'vite-plugin-monkey/dist/client'
+import type { ApiConversationWithId } from '../api'
 import { compatibleWorkSessionMarkers, isWorkSessionMarker } from './workSegment'
 import type { WorkSessionMarker } from './workSegment'
-import type { ApiConversationWithId } from '../api'
 
 // Preserve v1 bytes; its ambiguous provenance requires explicit recovery into v2.
 const KEY = 'rootcellar:work_session_markers:v2'
